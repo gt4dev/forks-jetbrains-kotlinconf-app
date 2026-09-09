@@ -28,6 +28,11 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions.jvmTarget = JvmTarget.JVM_11
         androidResources.enable = true
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }.configure {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     jvm()
@@ -89,14 +94,23 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(libs.compose.ui.test)
             implementation(libs.kotlin.test)
             implementation(libs.settings.test)
             implementation(libs.kotlinx.coroutines.test)
         }
 
         jvmTest.dependencies {
+            implementation(compose.desktop.currentOs)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+        }
+
+        // todo: maybe use ready/OOTB name like "android instrumented tests .."
+        named("androidDeviceTest") {
+            dependencies {
+                implementation(libs.compose.ui.test.junit4)
+            }
         }
 
         val nonAndroidMain by creating {
