@@ -43,7 +43,7 @@ import kotlin.time.Duration.Companion.minutes
 @OptIn(ExperimentalCoroutinesApi::class)
 @Inject
 @SingleIn(AppScope::class)
-class ConferenceService(
+open class ConferenceService(
     private val appClient: ApplicationApi,
     private val applicationStorage: ApplicationStorage,
     private val timeProvider: TimeProvider,
@@ -122,7 +122,7 @@ class ConferenceService(
 
     private val userId = applicationStorage.userId
 
-    val agenda: StateFlow<List<Day>> =
+    open val agenda: StateFlow<List<Day>> =
         combine(
             currentYearlyStorage.flatMapLatest { it.getConferenceCache() },
             currentYearlyStorage.flatMapLatest { it.getFavorites() },
@@ -132,7 +132,7 @@ class ConferenceService(
             conference?.buildAgenda(favorites, votes, time) ?: emptyList()
         }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    val votes: StateFlow<List<VoteInfo>> =
+    open val votes: StateFlow<List<VoteInfo>> =
         currentYearlyStorage.flatMapLatest { it.getVotes() }
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -141,7 +141,7 @@ class ConferenceService(
             it.flatMap { it.timeSlots }.flatMap { it.sessions }
         }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    val speakers: StateFlow<List<Speaker>> =
+    open val speakers: StateFlow<List<Speaker>> =
         currentYearlyStorage.flatMapLatest { it.getConferenceCache() }
             .map {
                 (it?.speakers ?: emptyList())
@@ -155,15 +155,15 @@ class ConferenceService(
         }
         .stateIn(scope, SharingStarted.Eagerly, emptyMap())
 
-    val conferenceInfo: StateFlow<ConferenceInfo?> =
+    open val conferenceInfo: StateFlow<ConferenceInfo?> =
         currentYearlyStorage.flatMapLatest { it.getConferenceInfoCache() }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
-    val mapData: StateFlow<MapData?> = conferenceInfo
+    open val mapData: StateFlow<MapData?> = conferenceInfo
         .map { it?.mapData }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
-    val goldenKodeeData: StateFlow<GoldenKodeeData?> =
+    open val goldenKodeeData: StateFlow<GoldenKodeeData?> =
         combine(
             currentYearlyStorage.flatMapLatest { it.getGoldenKodeeCache() },
             flagsManager.flags,
@@ -171,18 +171,18 @@ class ConferenceService(
             if (flags.useFakeGoldenKodeeData) FakeGoldenKodeeData else data
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
-    val currentYear: StateFlow<Int?> =
+    open val currentYear: StateFlow<Int?> =
         applicationStorage.getConfig()
             .map { it?.currentYear }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
-    fun getTheme(): Flow<Theme> = applicationStorage.getTheme()
+    open fun getTheme(): Flow<Theme> = applicationStorage.getTheme()
 
-    fun setTheme(theme: Theme) {
+    open fun setTheme(theme: Theme) {
         scope.launch { applicationStorage.setTheme(theme) }
     }
 
-    suspend fun loadConferenceData() {
+    open suspend fun loadConferenceData() {
         val currentYearGraph = currentYearGraph.value ?: return
         val storage = currentYearGraph.storage
         val client = currentYearGraph.api
@@ -238,11 +238,11 @@ class ConferenceService(
         }
     }
 
-    fun isOnboardingComplete(): Flow<Boolean> {
+    open fun isOnboardingComplete(): Flow<Boolean> {
         return applicationStorage.isOnboardingComplete()
     }
 
-    suspend fun completeOnboarding() {
+    open suspend fun completeOnboarding() {
         applicationStorage.setOnboardingComplete(true)
     }
 
@@ -251,7 +251,7 @@ class ConferenceService(
      *
      * @return true if the policy is signed.
      */
-    suspend fun acceptPrivacyNotice(): Boolean {
+    open suspend fun acceptPrivacyNotice(): Boolean {
         val currentYearGraph = currentYearGraph.value ?: return false
         val storage = currentYearGraph.storage
         val client = currentYearGraph.api
@@ -268,7 +268,7 @@ class ConferenceService(
         return success
     }
 
-    fun acceptPrivacyNoticeAsync() {
+    open fun acceptPrivacyNoticeAsync() {
         scope.launch {
             acceptPrivacyNotice()
         }
@@ -278,11 +278,11 @@ class ConferenceService(
      * Request permissions to send notifications.
      * @return true if permission was granted, false otherwise
      */
-    suspend fun requestNotificationPermissions(): Boolean =
+    open suspend fun requestNotificationPermissions(): Boolean =
         localNotificationService.requestPermission()
             .also { taggedLogger.log { "Notification permissions granted: $it" } }
 
-    fun getNotificationSettings(): Flow<NotificationSettings> =
+    open fun getNotificationSettings(): Flow<NotificationSettings> =
         currentYearlyStorage.flatMapLatest { it.getNotificationSettings() }
             .map {
                 // No stored value yet, create settings with everything enabled by default
@@ -292,7 +292,7 @@ class ConferenceService(
                 )
             }
 
-    suspend fun setNotificationSettings(settings: NotificationSettings) {
+    open suspend fun setNotificationSettings(settings: NotificationSettings) {
         val currentYearGraph = currentYearGraph.value ?: return
         val storage = currentYearGraph.storage
 
@@ -324,12 +324,12 @@ class ConferenceService(
         }
     }
 
-    suspend fun isPolicySigned(): Boolean {
+    open suspend fun isPolicySigned(): Boolean {
         val storage = currentYearGraph.value?.storage ?: return false
         return storage.isPolicySigned().first()
     }
 
-    suspend fun vote(sessionId: SessionId, rating: Score?): Boolean {
+    open suspend fun vote(sessionId: SessionId, rating: Score?): Boolean {
         if (!isPolicySigned()) return false
 
         val currentYearGraph = currentYearGraph.value ?: return false
@@ -348,30 +348,30 @@ class ConferenceService(
         return client.vote(sessionId, rating)
     }
 
-    suspend fun sendFeedback(sessionId: SessionId, feedbackValue: String): Boolean {
+    open suspend fun sendFeedback(sessionId: SessionId, feedbackValue: String): Boolean {
         if (!isPolicySigned()) return false
         val client = currentYearGraph.value?.api ?: return false
         return client.sendFeedback(sessionId, feedbackValue)
     }
 
-    fun speakerById(speakerId: SpeakerId): Speaker? = speakersById.value[speakerId]
+    open fun speakerById(speakerId: SpeakerId): Speaker? = speakersById.value[speakerId]
 
-    fun speakerByIdFlow(speakerId: SpeakerId): Flow<Speaker?> =
+    open fun speakerByIdFlow(speakerId: SpeakerId): Flow<Speaker?> =
         speakersById.map { it[speakerId] }
 
-    fun sessionByIdFlow(sessionId: SessionId): Flow<SessionCardView?> =
+    open fun sessionByIdFlow(sessionId: SessionId): Flow<SessionCardView?> =
         sessionCards.map { sessions -> sessions.find { it.id == sessionId } }
 
-    fun speakersBySessionId(sessionId: SessionId): Flow<List<Speaker>> =
+    open fun speakersBySessionId(sessionId: SessionId): Flow<List<Speaker>> =
         sessionByIdFlow(sessionId).map { session ->
             session?.speakerIds?.mapNotNull { speakerId -> speakerById(speakerId) } ?: emptyList()
         }
 
-    fun sessionsForSpeakerFlow(id: SpeakerId): Flow<List<SessionCardView>> =
+    open fun sessionsForSpeakerFlow(id: SpeakerId): Flow<List<SessionCardView>> =
         sessionCards.map { sessions -> sessions.filter { id in it.speakerIds } }
 
 
-    suspend fun setFavorite(sessionId: SessionId, favorite: Boolean) {
+    open suspend fun setFavorite(sessionId: SessionId, favorite: Boolean) {
         withContext(Dispatchers.Default + NonCancellable) {
             val currentYearGraph = currentYearGraph.value ?: return@withContext
             val storage = currentYearGraph.storage
@@ -503,7 +503,7 @@ class ConferenceService(
         }
     }
 
-    suspend fun downloadAllAssets() {
+    open suspend fun downloadAllAssets() {
         val currentYearGraph = currentYearGraph.value ?: return
         val storage = currentYearGraph.storage
         val client = currentYearGraph.api
@@ -544,7 +544,7 @@ class ConferenceService(
      * Reads the asset contents from cache if available,
      * or attempts to download it (once) if missing.
      */
-    suspend fun getAsset(path: String): String? {
+    open suspend fun getAsset(path: String): String? {
         taggedLogger.log { "Reading asset: $path" }
 
         val storage = currentYearGraph.filterNotNull().first().storage
@@ -560,7 +560,7 @@ class ConferenceService(
         return storage.getAsset(path)
     }
 
-    suspend fun downloadAsset(path: String) {
+    open suspend fun downloadAsset(path: String) {
         val currentYearGraph = currentYearGraph.value ?: return
         val storage = currentYearGraph.storage
         val client = currentYearGraph.api
@@ -575,7 +575,7 @@ class ConferenceService(
         }
     }
 
-    fun getPartner(partnerId: PartnerId): Flow<PartnerInfo?> {
+    open fun getPartner(partnerId: PartnerId): Flow<PartnerInfo?> {
         return conferenceInfo
             .filterNotNull()
             .map { info ->

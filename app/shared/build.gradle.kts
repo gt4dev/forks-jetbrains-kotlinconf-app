@@ -15,6 +15,19 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.metro)
+    alias(libs.plugins.kotlinAllOpen)
+    alias(libs.plugins.mokkery)
+}
+
+// Stable across IDE runs, check, and platform test tasks. Annotated classes are
+// also open in production; avoid brittle checks of requested Gradle task names.
+allOpen {
+    annotation("org.jetbrains.kotlinconf.OpenForMokkery")
+}
+
+mokkery {
+    // Generated mocks must not inherit Metro DI annotations.
+    annotations.copyToMock.set(dev.mokkery.options.AnnotationSelector.none)
 }
 
 kotlin {
@@ -94,6 +107,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(libs.ktor.client.mock)
             implementation(libs.compose.ui.test)
             implementation(libs.kotlin.test)
             implementation(libs.settings.test)
@@ -102,6 +116,7 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)
+            implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
